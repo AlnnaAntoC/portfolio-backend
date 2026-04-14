@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
 const axios = require('axios');
-const Contact = require('../models/Contact');   // ← ADDED
 
 router.post('/', async (req, res) => {
   console.log('Request received:', req.body);
@@ -62,16 +61,7 @@ router.post('/', async (req, res) => {
       `,
     });
 
-    // 4. Save to MongoDB                             // ← ADDED
-    await Contact.create({                            // ← ADDED
-      name,                                           // ← ADDED
-      email,                                          // ← ADDED
-      subject,                                        // ← ADDED
-      message,                                        // ← ADDED
-      captchaPassed: true,                            // ← ADDED
-    });                                               // ← ADDED
-
-    console.log('Email sent and saved to MongoDB!');
+    console.log('Email sent successfully!');
     res.status(200).json({ success: true, message: 'Email sent successfully!' });
   } catch (err) {
     console.error('Email error:', err.message);

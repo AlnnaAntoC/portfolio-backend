@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
 const multer = require('multer');
-const Resume = require('../models/Resume');   // ← ADDED
 
 // Store file in memory (not disk)
 const storage = multer.memoryStorage();
@@ -60,15 +59,7 @@ router.post('/', upload.single('resume'), async (req, res) => {
       ]
     });
 
-    // Save metadata to MongoDB                       // ← ADDED
-    await Resume.create({                             // ← ADDED
-      filename: req.file.originalname,                // ← ADDED
-      fileSize: req.file.size,                        // ← ADDED
-      mimeType: req.file.mimetype,                    // ← ADDED
-      emailedTo: process.env.HR_EMAIL,                // ← ADDED
-    });                                               // ← ADDED
-
-    console.log('Resume emailed and saved to MongoDB!');
+    console.log('Resume emailed successfully!');
     res.status(200).json({ success: true, message: 'Resume sent successfully!' });
   } catch (err) {
     console.error('Email error:', err.message);
