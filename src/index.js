@@ -8,8 +8,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+const normalizeOrigin = (url) => url?.replace(/\/+$/, "");
+
 const allowedOrigins = [
-  process.env.CLIENT_URL,
+  normalizeOrigin(process.env.CLIENT_URL),
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
   process.env.NODE_ENV !== 'production' ? 'http://127.0.0.1:3000' : null,
 ].filter(Boolean);
