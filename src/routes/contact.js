@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const mailjet = require('node-mailjet').connect(
+  process.env.MAILJET_API_KEY,
+  process.env.MAILJET_SECRET_KEY
+);
 
 router.post('/', async (req, res) => {
   console.log('Request received:', req.body);
@@ -43,22 +47,23 @@ router.post('/', async (req, res) => {
       throw new Error('Mailjet credentials are not configured');
     }
 
-    const mailjetRes = await axios.post(
-      'https://api.mailjet.com/v3.1/send',
-      {
+    const mailjetRes = await mailjet
+      .post('send', { version: 'v3.1' })
+      .request({
         Messages: [
           {
             From: {
-              Email: process.env.EMAIL_USER,
-              Name: name,
+              Email: process.env.MAILJET_SENDER_EMAIL,
+              Name: 'Portfolio Contact',
             },
             To: [
               {
-                Email: process.env.EMAIL_USER,
+                Email: process.env.CONTACT_EMAIL,
                 Name: 'Portfolio Owner',
               },
             ],
             Subject: `${subject} — from ${name}`,
+            TextPart: `Name: ${name}\nEmail: ${email}\nSubject: ${subject}\nMessage: ${message}`,
             HTMLPart: `
               <h3>New Contact Form Submission</h3>
               <p><strong>Name:</strong> ${name}</p>
@@ -66,26 +71,23 @@ router.post('/', async (req, res) => {
               <p><strong>Subject:</strong> ${subject}</p>
               <p><strong>Message:</strong> ${message}</p>
             `,
+            ReplyTo: {
+              Email: email,
+              Name: name,
+            },
           },
         ],
-      },
-      {
-        auth: {
-          username: process.env.MAILJET_API_KEY,
-          password: process.env.MAILJET_SECRET_KEY,
-        },
-      }
-    );
+      });
 
-    const status = mailjetRes.data?.Messages?.[0]?.Status;
+    const status = mailjetRes.body?.Messages?.[0]?.Status;
     if (status !== 'success') {
       throw new Error(`Mailjet send failed: ${status}`);
     }
 
-    console.log('Email sent successfully via Mailjet!');
+    console.log('Email sent successfully via Mailjet!', JSON.stringify(mailjetRes.body));
     res.status(200).json({ success: true, message: 'Email sent successfully!' });
   } catch (err) {
-    console.error('Email error:', err.message);
+    console.error('Email error:', err.message || err);
     res.status(500).json({ error: 'Failed to send email' });
   }
 });

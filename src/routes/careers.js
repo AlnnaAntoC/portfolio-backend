@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
+const mailjet = require('node-mailjet').connect(
+  process.env.MAILJET_API_KEY,
+  process.env.MAILJET_SECRET_KEY
+);
 const multer = require('multer');
 
 // Store file in memory (not disk)
@@ -35,13 +38,13 @@ router.post('/', upload.single('resume'), async (req, res) => {
       throw new Error('Mailjet credentials are not configured');
     }
 
-    const mailjetRes = await axios.post(
-      'https://api.mailjet.com/v3.1/send',
-      {
+    const mailjetRes = await mailjet
+      .post('send', { version: 'v3.1' })
+      .request({
         Messages: [
           {
             From: {
-              Email: process.env.EMAIL_USER,
+              Email: process.env.MAILJET_SENDER_EMAIL,
               Name: 'Portfolio Careers',
             },
             To: [
@@ -51,6 +54,7 @@ router.post('/', upload.single('resume'), async (req, res) => {
               },
             ],
             Subject: `New Resume Received — ${req.file.originalname}`,
+            TextPart: `A resume has been uploaded via the careers page. File: ${req.file.originalname}, Size: ${(req.file.size / 1024).toFixed(1)} KB`,
             HTMLPart: `
               <h3>New Resume Submission</h3>
               <p>A new resume has been uploaded via the careers page.</p>
@@ -67,21 +71,14 @@ router.post('/', upload.single('resume'), async (req, res) => {
             ],
           },
         ],
-      },
-      {
-        auth: {
-          username: process.env.MAILJET_API_KEY,
-          password: process.env.MAILJET_SECRET_KEY,
-        },
-      }
-    );
+      });
 
-    const status = mailjetRes.data?.Messages?.[0]?.Status;
+    const status = mailjetRes.body?.Messages?.[0]?.Status;
     if (status !== 'success') {
       throw new Error(`Mailjet send failed: ${status}`);
     }
 
-    console.log('Resume emailed successfully via Mailjet!');
+    console.log('Resume emailed successfully via Mailjet!', JSON.stringify(mailjetRes.body));
     res.status(200).json({ success: true, message: 'Resume sent successfully!' });
   } catch (err) {
     console.error('Email error:', err.message);
