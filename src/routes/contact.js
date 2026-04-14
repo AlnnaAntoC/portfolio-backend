@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const nodemailer = require('nodemailer');
 const axios = require('axios');
 
 router.post('/', async (req, res) => {
@@ -38,30 +37,52 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: 'CAPTCHA check failed' });
   }
 
-  // 3. Send the email
+  // 3. Send the email via Mailjet
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+    if (!process.env.MAILJET_API_KEY || !process.env.MAILJET_SECRET_KEY) {
+      throw new Error('Mailjet credentials are not configured');
+    }
+
+    const mailjetRes = await axios.post(
+      'https://api.mailjet.com/v3.1/send',
+      {
+        Messages: [
+          {
+            From: {
+              Email: process.env.EMAIL_USER,
+              Name: name,
+            },
+            To: [
+              {
+                Email: process.env.EMAIL_USER,
+                Name: 'Portfolio Owner',
+              },
+            ],
+            Subject: `${subject} — from ${name}`,
+            HTMLPart: `
+              <h3>New Contact Form Submission</h3>
+              <p><strong>Name:</strong> ${name}</p>
+              <p><strong>Email:</strong> ${email}</p>
+              <p><strong>Subject:</strong> ${subject}</p>
+              <p><strong>Message:</strong> ${message}</p>
+            `,
+          },
+        ],
       },
-    });
+      {
+        auth: {
+          username: process.env.MAILJET_API_KEY,
+          password: process.env.MAILJET_SECRET_KEY,
+        },
+      }
+    );
 
-    await transporter.sendMail({
-      from: `"${name}" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER,
-      subject: `${subject} — from ${name}`,
-      html: `
-        <h3>New Contact Form Submission</h3>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Subject:</strong> ${subject}</p>
-        <p><strong>Message:</strong> ${message}</p>
-      `,
-    });
+    const status = mailjetRes.data?.Messages?.[0]?.Status;
+    if (status !== 'success') {
+      throw new Error(`Mailjet send failed: ${status}`);
+    }
 
-    console.log('Email sent successfully!');
+    console.log('Email sent successfully via Mailjet!');
     res.status(200).json({ success: true, message: 'Email sent successfully!' });
   } catch (err) {
     console.error('Email error:', err.message);

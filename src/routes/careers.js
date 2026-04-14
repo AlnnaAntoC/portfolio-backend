@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 const multer = require('multer');
 
 // Store file in memory (not disk)
@@ -31,35 +31,57 @@ router.post('/', upload.single('resume'), async (req, res) => {
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+    if (!process.env.MAILJET_API_KEY || !process.env.MAILJET_SECRET_KEY) {
+      throw new Error('Mailjet credentials are not configured');
+    }
+
+    const mailjetRes = await axios.post(
+      'https://api.mailjet.com/v3.1/send',
+      {
+        Messages: [
+          {
+            From: {
+              Email: process.env.EMAIL_USER,
+              Name: 'Portfolio Careers',
+            },
+            To: [
+              {
+                Email: process.env.HR_EMAIL,
+                Name: 'HR Team',
+              },
+            ],
+            Subject: `New Resume Received — ${req.file.originalname}`,
+            HTMLPart: `
+              <h3>New Resume Submission</h3>
+              <p>A new resume has been uploaded via the careers page.</p>
+              <p><strong>File:</strong> ${req.file.originalname}</p>
+              <p><strong>Size:</strong> ${(req.file.size / 1024).toFixed(1)} KB</p>
+              <p>Please find the resume attached.</p>
+            `,
+            Attachments: [
+              {
+                ContentType: req.file.mimetype,
+                Filename: req.file.originalname,
+                Base64Content: req.file.buffer.toString('base64'),
+              },
+            ],
+          },
+        ],
       },
-    });
+      {
+        auth: {
+          username: process.env.MAILJET_API_KEY,
+          password: process.env.MAILJET_SECRET_KEY,
+        },
+      }
+    );
 
-    await transporter.sendMail({
-      from: `"Portfolio Careers" <${process.env.EMAIL_USER}>`,
-      to: process.env.HR_EMAIL,
-      subject: `New Resume Received — ${req.file.originalname}`,
-      html: `
-        <h3>New Resume Submission</h3>
-        <p>A new resume has been uploaded via the careers page.</p>
-        <p><strong>File:</strong> ${req.file.originalname}</p>
-        <p><strong>Size:</strong> ${(req.file.size / 1024).toFixed(1)} KB</p>
-        <p>Please find the resume attached.</p>
-      `,
-      attachments: [
-        {
-          filename: req.file.originalname,
-          content: req.file.buffer,
-          contentType: req.file.mimetype,
-        }
-      ]
-    });
+    const status = mailjetRes.data?.Messages?.[0]?.Status;
+    if (status !== 'success') {
+      throw new Error(`Mailjet send failed: ${status}`);
+    }
 
-    console.log('Resume emailed successfully!');
+    console.log('Resume emailed successfully via Mailjet!');
     res.status(200).json({ success: true, message: 'Resume sent successfully!' });
   } catch (err) {
     console.error('Email error:', err.message);
