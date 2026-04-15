@@ -10,11 +10,16 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 const normalizeOrigin = (url) => url?.replace(/\/+$/, "");
 
+const clientOrigin = normalizeOrigin(process.env.CLIENT_URL);
 const allowedOrigins = [
-  normalizeOrigin(process.env.CLIENT_URL),
+  clientOrigin,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
   process.env.NODE_ENV !== 'production' ? 'http://127.0.0.1:3000' : null,
 ].filter(Boolean);
+
+if (!clientOrigin) {
+  console.warn('Warning: CLIENT_URL is not configured for CORS. In production, only the frontend origin will be allowed.');
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
